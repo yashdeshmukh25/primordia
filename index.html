@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A living particle universe grown from one rule — local chemistry, a deep field, bonds, and birth and death, all in your browser.">
+<title>Primordia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /*
+    Layout concept: a full-bleed canvas is the universe itself. A single
+    instrument panel floats over it, organized as tabs — this console has
+    three physics layers (local chemistry, deep field, bonds) plus time
+    controls and a genetic codex, too much for one scroll. Committed single
+    dark world: there is no "light mode" for a void.
+  */
+  :root{
+    color-scheme: dark;
+    --void: #06070d;
+    --panel: rgba(14,16,28,0.74);
+    --panel-solid: #0e101c;
+    --line: rgba(223,228,255,0.11);
+    --line-bright: rgba(223,228,255,0.22);
+    --bright: #f1f3fb;
+    --mist: #9aa2c0;
+    --mist-dim: #656d8c;
+    --accent: #6ef0c8;
+    --accent-soft: rgba(110,240,200,0.16);
+    --bond: #b794f6;
+    --bond-soft: rgba(183,148,246,0.18);
+    --warn: #ff7fa6;
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html, body{ height: 100%; }
+  body{ margin: 0; background: var(--void); color: var(--bright); font-family: var(--font-body); overflow: hidden; position: relative; }
+
+  #stage{ position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; background: var(--void); }
+  .scrim-top{ position: fixed; top: 0; left: 0; right: 0; height: 120px; background: linear-gradient(to bottom, rgba(2,3,6,0.55), transparent); pointer-events: none; z-index: 1; }
+
+  .wordmark{ position: fixed; top: calc(22px + env(safe-area-inset-top, 0px)); left: 24px; z-index: 2; pointer-events: none; }
+  .wordmark h1{ margin: 0; font-family: var(--font-display); font-weight: 600; font-style: italic; font-size: clamp(22px, 4vw, 30px); letter-spacing: 0.01em; text-shadow: 0 0 30px rgba(110,240,200,0.35), 0 2px 14px rgba(0,0,0,0.6); }
+  .wordmark p{ margin: 2px 0 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mist); text-shadow: 0 2px 10px rgba(0,0,0,0.7); }
+
+  #toggle{ position: fixed; top: calc(22px + env(safe-area-inset-top, 0px)); right: 24px; z-index: 4; width: 42px; height: 42px; border-radius: 999px; border: 1px solid var(--line-bright); background: var(--panel); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--bright); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background 0.2s ease; }
+  #toggle:hover{ background: rgba(14,16,28,0.9); }
+  #toggle:active{ transform: scale(0.94); }
+  @media (prefers-reduced-motion: reduce){ #toggle{ transition: none; } }
+
+  #panel{ position: fixed; z-index: 3; top: calc(22px + env(safe-area-inset-top, 0px)); right: 24px; width: 328px; max-height: calc(100% - 44px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; margin-top: 58px; border-radius: 18px; border: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 20px 60px rgba(0,0,0,0.45); transform-origin: top right; transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s; }
+  #panel[hidden]{ opacity: 0; transform: scale(0.96) translateY(-6px); pointer-events: none; visibility: hidden; display: flex !important; }
+  @media (prefers-reduced-motion: reduce){ #panel{ transition: none; } }
+
+  .tabbar{ display: flex; gap: 3px; overflow-x: auto; padding: 14px 14px 10px; border-bottom: 1px solid var(--line); flex: none; }
+  .tabbar::-webkit-scrollbar{ display: none; }
+  .tab-btn{ flex: none; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; padding: 7px 9px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--mist); cursor: pointer; white-space: nowrap; }
+  .tab-btn.active{ background: var(--accent-soft); color: var(--accent); border-color: rgba(110,240,200,0.35); }
+
+  .tab-body{ flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px 18px calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .tab-panel[hidden]{ display: none; }
+
+  .section{ margin-bottom: 18px; }
+  .section:last-child{ margin-bottom: 0; }
+  .eyebrow{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mist-dim); margin: 0 0 10px; }
+  .eyebrow.bond-tint{ color: var(--bond); }
+
+  .grid2{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row{ display: flex; gap: 8px; }
+  .row + .row{ margin-top: 8px; }
+
+  button.cmd{ min-width: 0; font-family: var(--font-body); font-weight: 500; font-size: 12px; color: var(--bright); background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 9px 6px; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+  button.cmd:hover{ background: rgba(255,255,255,0.09); border-color: var(--line-bright); }
+  button.cmd:active{ transform: translateY(1px); }
+  button.cmd.primary{ background: var(--accent-soft); border-color: rgba(110,240,200,0.4); color: var(--accent); }
+  button.cmd.primary:hover{ background: rgba(110,240,200,0.24); }
+  button.cmd.ghost{ background: transparent; }
+  button.cmd.bondish[aria-pressed="true"]{ background: var(--bond-soft); border-color: rgba(183,148,246,0.45); color: var(--bond); }
+  button.cmd[aria-pressed="true"]{ background: var(--accent-soft); border-color: rgba(110,240,200,0.4); color: var(--accent); }
+  button.cmd.small{ font-size: 10.5px; padding: 6px; }
+
+  select, textarea{ width: 100%; font-family: var(--font-body); font-size: 12.5px; color: var(--bright); background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; }
+  select{ cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239aa2c0'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  select option{ background: var(--panel-solid); color: var(--bright); }
+  textarea{ font-family: var(--font-mono); font-size: 10.5px; line-height: 1.5; resize: vertical; min-height: 64px; }
+
+  .field{ margin-top: 12px; }
+  .field:first-child{ margin-top: 0; }
+  .field-head{ display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; }
+  .field-head label{ font-size: 12px; color: var(--mist); min-width: 0; }
+  .field-head output{ font-family: var(--font-mono); font-size: 11px; color: var(--accent); font-variant-numeric: tabular-nums; flex: none; }
+  input[type=range]{ width: 100%; appearance: none; -webkit-appearance: none; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.12); outline-offset: 4px; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance: none; width: 13px; height: 13px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 3px rgba(110,240,200,0.18); cursor: pointer; }
+  input[type=range]::-moz-range-thumb{ width: 13px; height: 13px; border: none; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 3px rgba(110,240,200,0.18); cursor: pointer; }
+
+  .matrix-grid{ display: grid; gap: 3px; margin-top: 2px; }
+  .m-cell{ aspect-ratio: 1; min-width: 0; border-radius: 4px; border: none; cursor: pointer; padding: 0; transition: transform 0.1s ease; }
+  .m-cell:hover{ transform: scale(1.12); }
+  .m-cell:active{ transform: scale(0.92); }
+  .m-legend{ display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--mist-dim); }
+
+  .stats{ font-family: var(--font-mono); font-size: 11.5px; color: var(--mist); line-height: 1.9; font-variant-numeric: tabular-nums; }
+  .stats b{ color: var(--bright); font-weight: 500; }
+
+  .sp-row{ border: 1px solid var(--line); border-radius: 10px; padding: 9px; margin-bottom: 7px; }
+  .sp-row:last-child{ margin-bottom: 0; }
+  .sp-top{ display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .sp-swatch{ width: 20px; height: 20px; flex: none; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; padding: 0; }
+  .sp-label{ font-family: var(--font-mono); font-size: 10.5px; color: var(--mist); flex: 1; min-width: 0; }
+  .sp-top button.mini{ flex: none; width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--mist); font-size: 11px; cursor: pointer; line-height: 1; }
+  .sp-top button.mini[aria-pressed="true"]{ background: var(--accent-soft); border-color: rgba(110,240,200,0.4); color: var(--accent); }
+  .sp-sliders{ display: flex; gap: 10px; }
+  .sp-sliders > div{ flex: 1; min-width: 0; }
+  .sp-sliders label{ display: block; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mist-dim); margin-bottom: 4px; }
+
+  .tool-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tool-grid button.cmd{ font-size: 11px; padding: 9px 4px; }
+
+  .swatch-row{ display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .swatch-pick{ width: 26px; height: 26px; border-radius: 999px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .swatch-pick[aria-pressed="true"]{ border-color: var(--bright); }
+
+  #telemetry{ width: 100%; height: 46px; display: block; border-radius: 8px; background: rgba(255,255,255,0.03); margin-top: 6px; }
+
+  details.about{ border-top: 1px solid var(--line); padding-top: 14px; }
+  details.about summary{ cursor: pointer; font-size: 12.5px; color: var(--mist); list-style: none; display: flex; align-items: center; gap: 6px; }
+  details.about summary::-webkit-details-marker{ display: none; }
+  details.about summary::before{ content: '+'; font-family: var(--font-mono); color: var(--accent); width: 14px; }
+  details.about[open] summary::before{ content: '–'; }
+  details.about p{ font-size: 12.5px; line-height: 1.65; color: var(--mist); margin: 10px 0 0; }
+  details.about p + p{ margin-top: 10px; }
+  details.about .cap{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--mist-dim); text-transform: uppercase; }
+  .keys{ font-family: var(--font-mono); font-size: 10.5px; color: var(--mist); line-height: 2; margin-top: 10px; }
+  .keys b{ color: var(--accent); margin-right: 8px; }
+
+  .hint{ position: fixed; left: 24px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 2; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--mist-dim); pointer-events: none; max-width: 55%; }
+
+  @media (max-width: 640px){
+    #panel{ left: 12px; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 68vh; margin-top: 0; transform-origin: bottom center; }
+    #panel[hidden]{ transform: scale(0.97) translateY(8px); }
+    #toggle{ top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: 12px; }
+    .wordmark{ left: 16px; }
+    .hint{ display: none; }
+  }
+</style>
+
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="scrim-top"></div>
+
+<div class="wordmark">
+  <h1>Primordia</h1>
+  <p>a particle universe, grown from one rule</p>
+</div>
+
+<button id="toggle" title="Toggle controls" aria-expanded="true" aria-controls="panel">⚙</button>
+<div class="hint" id="hint">drag in the void to stir the swarm</div>
+
+<div id="panel">
+  <div class="tabbar" role="tablist">
+    <button class="tab-btn active" data-tab="genesis">Genesis</button>
+    <button class="tab-btn" data-tab="physics">Physics</button>
+    <button class="tab-btn" data-tab="species">Species</button>
+    <button class="tab-btn" data-tab="field">Field</button>
+    <button class="tab-btn" data-tab="chemistry">Chemistry</button>
+    <button class="tab-btn" data-tab="life">Life</button>
+    <button class="tab-btn" data-tab="codex">Codex</button>
+    <button class="tab-btn" data-tab="about">About</button>
+  </div>
+
+  <div class="tab-body">
+
+    <div class="tab-panel" data-panel="genesis">
+      <div class="section">
+        <p class="eyebrow">Genesis</p>
+        <div class="grid2">
+          <button class="cmd primary" id="btn-organism">New organism</button>
+          <button class="cmd" id="btn-mutate">Mutate rules</button>
+          <button class="cmd" id="btn-reseed">Reseed</button>
+          <button class="cmd ghost" id="btn-undo">Undo local</button>
+        </div>
+        <div class="field">
+          <select id="preset">
+            <option value="random">Random rules</option>
+            <option value="cells">Cells — blobbing</option>
+            <option value="chase">Chase — orbiting</option>
+            <option value="crystal">Crystal — lattices</option>
+            <option value="chaos">Chaos — turbulent</option>
+            <option value="symbiosis">Symbiosis — chains</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="eyebrow">Local chemistry — short range, per particle</p>
+        <div class="matrix-grid" id="matrix"></div>
+        <div class="m-legend"><span>repel</span><span>neutral</span><span>attract</span></div>
+      </div>
+
+      <div class="section">
+        <p class="eyebrow">Deep field — long range, per species center of mass</p>
+        <div class="matrix-grid" id="deepmatrix"></div>
+        <div class="m-legend"><span>flee center</span><span>neutral</span><span>chase center</span></div>
+        <div class="row" style="margin-top:8px">
+          <button class="cmd ghost small" id="btn-deep-reroll">Reroll deep field</button>
+          <button class="cmd ghost small" id="btn-deep-undo">Undo deep</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="eyebrow">Autoevolve</p>
+        <div class="row">
+          <button class="cmd" id="btn-drift">Drift: off</button>
+        </div>
+        <div class="field"><div class="field-head"><label for="s-driftrate">Drift rate</label><output id="o-driftrate">0.30</output></div><input type="range" id="s-driftrate" min="0" max="1" step="0.05" value="0.3"></div>
+      </div>
+
+      <div class="section">
+        <p class="eyebrow">Readout</p>
+        <div class="stats">
+          live particles <b id="stat-n">—</b><br>
+          species <b id="stat-s">—</b><br>
+          mean velocity <b id="stat-v">—</b><br>
+          gravity wells <b id="stat-w">—</b><br>
+          active bonds <b id="stat-b">—</b><br>
+          alive <b id="stat-alive-g">—</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="physics" hidden>
+      <div class="section">
+        <p class="eyebrow">Forces</p>
+        <div class="field"><div class="field-head"><label for="s-species">Species</label><output id="o-species">4</output></div><input type="range" id="s-species" min="2" max="6" step="1" value="4"></div>
+        <div class="field"><div class="field-head"><label for="s-count">Particles</label><output id="o-count">900</output></div><input type="range" id="s-count" min="200" max="1800" step="100" value="900"></div>
+        <div class="field"><div class="field-head"><label for="s-force">Force</label><output id="o-force">1.00</output></div><input type="range" id="s-force" min="0.2" max="3" step="0.05" value="1"></div>
+        <div class="field"><div class="field-head"><label for="s-friction">Viscosity</label><output id="o-friction">0.900</output></div><input type="range" id="s-friction" min="0.80" max="0.98" step="0.005" value="0.90"></div>
+        <div class="field"><div class="field-head"><label for="s-radius">Reach</label><output id="o-radius">70</output></div><input type="range" id="s-radius" min="30" max="140" step="5" value="70"></div>
+        <div class="field"><div class="field-head"><label for="s-beta">Core radius β</label><output id="o-beta">0.30</output></div><input type="range" id="s-beta" min="0.1" max="0.5" step="0.02" value="0.3"></div>
+        <div class="field"><div class="field-head"><label for="s-deepstrength">Deep pull</label><output id="o-deepstrength">0.50</output></div><input type="range" id="s-deepstrength" min="0" max="1.5" step="0.05" value="0.5"></div>
+        <div class="field"><div class="field-head"><label for="s-temp">Temperature</label><output id="o-temp">0.00</output></div><input type="range" id="s-temp" min="0" max="1.5" step="0.05" value="0"></div>
+        <div class="field"><div class="field-head"><label for="s-maxv">Max speed</label><output id="o-maxv">6.0</output></div><input type="range" id="s-maxv" min="2" max="12" step="0.5" value="6"></div>
+        <div class="field">
+          <div class="field-head"><label for="s-boundary">Boundary</label></div>
+          <select id="s-boundary">
+            <option value="wrap">Wrap — toroidal</option>
+            <option value="bounce">Bounce — hard walls</option>
+            <option value="well">Well — central gravity</option>
+          </select>
+        </div>
+      </div>
+      <div class="section">
+        <p class="eyebrow">Time</p>
+        <div class="grid2">
+          <button class="cmd" id="btn-pause">Pause</button>
+          <button class="cmd ghost" id="btn-step">Step ▸</button>
+        </div>
+        <div class="field"><div class="field-head"><label for="s-speed">Speed</label><output id="o-speed">1.00×</output></div><input type="range" id="s-speed" min="0.25" max="3" step="0.25" value="1"></div>
+        <div class="field">
+          <div class="field-head"><label for="s-rewind">Rewind</label><output id="o-rewind">live</output></div>
+          <input type="range" id="s-rewind" min="0" max="0" step="1" value="0">
+        </div>
+        <canvas id="telemetry" width="280" height="46"></canvas>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="species" hidden>
+      <div class="section">
+        <p class="eyebrow">Per-species dials</p>
+        <div id="species-list"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="field" hidden>
+      <div class="section">
+        <p class="eyebrow">Pointer tool</p>
+        <div class="tool-grid">
+          <button class="cmd" data-tool="stir">Stir</button>
+          <button class="cmd" data-tool="attract">Attract</button>
+          <button class="cmd" data-tool="vortex">Vortex</button>
+          <button class="cmd" data-tool="paint">Paint</button>
+          <button class="cmd" data-tool="well">Well</button>
+        </div>
+      </div>
+      <div class="section" id="paint-controls" hidden>
+        <p class="eyebrow">Paint</p>
+        <div class="swatch-row" id="paint-swatches"></div>
+        <div class="field"><div class="field-head"><label for="s-brush">Brush size</label><output id="o-brush">28</output></div><input type="range" id="s-brush" min="10" max="60" step="2" value="28"></div>
+      </div>
+      <div class="section" id="well-controls" hidden>
+        <p class="eyebrow">Gravity wells</p>
+        <div class="field"><div class="field-head"><label for="s-wellstr">Strength</label><output id="o-wellstr">1.20</output></div><input type="range" id="s-wellstr" min="-2" max="2" step="0.1" value="1.2"></div>
+        <div class="row" style="margin-top:8px"><button class="cmd ghost" id="btn-clearwells">Clear all wells</button></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="chemistry" hidden>
+      <div class="section">
+        <p class="eyebrow bond-tint">Chemistry</p>
+        <p style="font-size:11.5px;color:var(--mist);line-height:1.6;margin:0 0 10px">Compatible particles that touch form a spring-like bond. Stretch it too far and it snaps.</p>
+        <div class="row">
+          <button class="cmd bondish" id="btn-chem-toggle" aria-pressed="true" style="flex:1">Bonds: on</button>
+          <button class="cmd ghost" id="btn-chem-reroll" style="flex:1">Reroll</button>
+        </div>
+      </div>
+      <div class="section">
+        <p class="eyebrow bond-tint">Bond affinity</p>
+        <div class="matrix-grid" id="bondmatrix"></div>
+        <div class="m-legend"><span>none</span><span>—</span><span>strong bond</span></div>
+        <div class="row" style="margin-top:8px"><button class="cmd ghost small" id="btn-bond-undo">Undo affinity</button></div>
+      </div>
+      <div class="section">
+        <div class="field"><div class="field-head"><label for="s-bondstiff">Stiffness</label><output id="o-bondstiff">0.18</output></div><input type="range" id="s-bondstiff" min="0.05" max="0.6" step="0.01" value="0.18"></div>
+        <div class="field"><div class="field-head"><label for="s-bondbreak">Break reach</label><output id="o-bondbreak">3.0</output></div><input type="range" id="s-bondbreak" min="1.5" max="5" step="0.1" value="3"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="life" hidden>
+      <div class="section">
+        <p class="eyebrow">Life and death</p>
+        <p style="font-size:11.5px;color:var(--mist);line-height:1.6;margin:0 0 10px">Off by default — it's the one system that can end the universe. Every particle burns energy to move and gains a trickle back for free. Starve and it dies. Hoard enough and it splits in two.</p>
+        <div class="row"><button class="cmd" id="btn-life-toggle" style="flex:1">Life: off</button></div>
+        <div class="field"><div class="field-head"><label for="s-egain">Energy gain</label><output id="o-egain">0.012</output></div><input type="range" id="s-egain" min="0" max="0.05" step="0.002" value="0.012"></div>
+        <div class="field"><div class="field-head"><label for="s-mcost">Move cost</label><output id="o-mcost">0.010</output></div><input type="range" id="s-mcost" min="0" max="0.05" step="0.002" value="0.01"></div>
+        <div class="field"><div class="field-head"><label for="s-repro">Repro threshold</label><output id="o-repro">2.0</output></div><input type="range" id="s-repro" min="1.2" max="4" step="0.1" value="2"></div>
+        <div class="field"><div class="field-head"><label for="s-rcost">Repro split</label><output id="o-rcost">0.50</output></div><input type="range" id="s-rcost" min="0.2" max="0.8" step="0.05" value="0.5"></div>
+        <div class="field"><div class="field-head"><label for="s-mutant">Mutant chance</label><output id="o-mutant">0.05</output></div><input type="range" id="s-mutant" min="0" max="0.3" step="0.01" value="0.05"></div>
+      </div>
+      <div class="section">
+        <p class="eyebrow">Readout</p>
+        <div class="stats">alive <b id="stat-alive">—</b></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="codex" hidden>
+      <div class="section">
+        <p class="eyebrow">Genetic code — this universe</p>
+        <textarea id="seed-out" readonly rows="4"></textarea>
+        <div class="row" style="margin-top:8px"><button class="cmd primary" id="btn-copy" style="flex:1">Copy seed</button></div>
+      </div>
+      <div class="section">
+        <p class="eyebrow">Load a seed</p>
+        <textarea id="seed-in" rows="4" placeholder="paste a Primordia seed here"></textarea>
+        <div class="row" style="margin-top:8px"><button class="cmd" id="btn-load" style="flex:1">Load seed</button></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="about" hidden>
+      <details class="about" open>
+        <summary>What is this</summary>
+        <p><span class="cap">The one rule —</span> every species is just a number grid. Cell (i, j) says how strongly species i is pulled toward or pushed away from species j at short range. That grid is the entire design.</p>
+        <p><span class="cap">Three layers now —</span> local chemistry (short-range, particle to particle), deep field (long-range, species center-of-mass to center-of-mass — whole swarms can chase or flee each other), and bonds (compatible particles physically link, stretch, and snap). None of them know about each other. What you see is all three running at once.</p>
+        <p><span class="cap">Autoevolve —</span> turn on Drift and the local rule grid mutates itself every couple of seconds, on its own, forever. The organism you're watching is not the one you started with ten minutes ago.</p>
+        <p><span class="cap">Life and death —</span> a fourth, optional layer. Particles spend energy to move, earn a trickle back for free, split in two past a threshold (the child can randomly mutate to a different species), and vanish at zero. Turn it on and population becomes an outcome, not a setting — species can boom, starve, or go extinct while you watch.</p>
+        <p><span class="cap">Why it's shown this way —</span> the same pattern — simple local rule, no center, real complexity — runs underneath flocking birds, immune cells, and galaxy clusters. Nobody designs the flock. The rule is enough; these are just more rules, stacked.</p>
+        <p class="cap" style="margin-top:14px">Keys</p>
+        <div class="keys">
+          <div><b>Space</b>pause / resume</div>
+          <div><b>N</b>new organism</div>
+          <div><b>M</b>mutate local rules</div>
+          <div><b>R</b>reseed positions</div>
+          <div><b>U</b>undo local edit</div>
+          <div><b>D</b>toggle autoevolve</div>
+          <div><b>C</b>toggle chemistry</div>
+          <div><b>V</b>toggle life / death</div>
+          <div><b>1–6</b>pick paint species</div>
+          <div><b>[ ]</b>force down / up</div>
+          <div><b>L</b>jump to live</div>
+        </div>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var canvas = document.getElementById('stage');
+  var ctx = canvas.getContext('2d', { alpha: false });
+  var dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  var W = 0, H = 0;
+
+  function resize(){
+    var r = document.body.getBoundingClientRect();
+    W = Math.max(1, r.width);
+    H = Math.max(1, r.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  var MAX_N = 2600;
+  var MAX_SP = 6;
+  var BOND_CAP = 600;
+  var MAX_BPP = 4;
+  var HUES = [164, 330, 44, 262, 10, 140];
+  var PALETTE = [164, 330, 44, 262, 10, 140, 196, 24, 300, 90];
+
+  function hueColor(h, alpha){ return 'hsla(' + h + ', 90%, 64%, ' + alpha + ')'; }
+  function clampForce(v){ return Math.max(-1, Math.min(1, v)); }
+
+  var state = {
+    n: 900, species: 4,
+    force: 1, friction: 0.90, radius: 70, beta: 0.3, temp: 0, maxSpeed: 6,
+    deepStrength: 0.5,
+    boundary: 'wrap', speed: 1, paused: false,
+    tool: 'stir', paintSpecies: 0, brush: 28, wellStrength: 1.2,
+    matrix: [], deepMatrix: [], bondMatrix: [],
+    chemistryOn: true, bondStiff: 0.18, bondBreak: 3,
+    autoevolve: false, driftRate: 0.3,
+    lifecycleOn: false, energyGain: 0.012, energyMoveCost: 0.01, reproThreshold: 2, reproCost: 0.5, mutantChance: 0.05,
+    mass: new Float32Array(MAX_SP).fill(1),
+    size: new Float32Array(MAX_SP).fill(2),
+    hue: Float32Array.from(HUES),
+    frozen: new Uint8Array(MAX_SP),
+    hidden: new Uint8Array(MAX_SP),
+    wells: [],
+    px: new Float32Array(MAX_N), py: new Float32Array(MAX_N),
+    vx: new Float32Array(MAX_N), vy: new Float32Array(MAX_N),
+    sp: new Uint8Array(MAX_N)
+  };
+
+  // bond bookkeeping (not part of the saved "genetics", just runtime structure)
+  var bonds = new Map();
+  var bondCount = new Uint8Array(MAX_N);
+  var liveBonds = [];
+  var bfx = new Float32Array(MAX_N), bfy = new Float32Array(MAX_N);
+  function bondKey(i, j){ return i < j ? (i * MAX_N + j) : (j * MAX_N + i); }
+
+  // lifecycle: energy, death, reproduction (off by default; alive[] is all-1 until this runs)
+  var energy = new Float32Array(MAX_N);
+  var alive = new Uint8Array(MAX_N);
+  var deadStack = [];
+
+  // species centroids, used by the deep field layer
+  var centX = new Float32Array(MAX_SP), centY = new Float32Array(MAX_SP), centN = new Int32Array(MAX_SP);
+
+  function makeHistory(){
+    var h = [];
+    return {
+      push: function(m){ h.push(JSON.parse(JSON.stringify(m))); if (h.length > 25) h.shift(); },
+      pop: function(){ return h.pop(); },
+      has: function(){ return h.length > 0; },
+      clear: function(){ h.length = 0; }
+    };
+  }
+  var localHist = makeHistory(), deepHist = makeHistory(), bondHist = makeHistory();
+
+  function randMatrix(n, mode){
+    var m = [], i, j;
+    for (i = 0; i < n; i++){ m.push(new Array(n).fill(0)); }
+    switch(mode){
+      case 'cells':
+        for (i = 0; i < n; i++) for (j = i; j < n; j++){
+          var v = (Math.random() * 1.6 - 0.3);
+          if (i === j) v = Math.abs(v) * 0.9 + 0.2;
+          m[i][j] = v; m[j][i] = v;
+        }
+        break;
+      case 'chase':
+        for (i = 0; i < n; i++) for (j = 0; j < n; j++){
+          if (i === j){ m[i][j] = 0.6; continue; }
+          var mag = Math.random() * 0.8 + 0.3;
+          m[i][j] = (i < j) ? mag : -mag;
+        }
+        break;
+      case 'crystal':
+        for (i = 0; i < n; i++) for (j = 0; j < n; j++){
+          m[i][j] = (i === j) ? (0.7 + Math.random() * 0.3) : -(Math.random() * 0.5 + 0.1);
+        }
+        break;
+      case 'chaos':
+        for (i = 0; i < n; i++) for (j = 0; j < n; j++){ m[i][j] = Math.random() * 2.4 - 1.2; }
+        break;
+      case 'symbiosis':
+        for (i = 0; i < n; i++) for (j = 0; j < n; j++){
+          if (i === j){ m[i][j] = 0.3; }
+          else if ((j - i + n) % n === 1){ m[i][j] = 0.9; }
+          else if ((i - j + n) % n === 1){ m[i][j] = -0.5; }
+          else { m[i][j] = -0.05; }
+        }
+        break;
+      default:
+        for (i = 0; i < n; i++) for (j = 0; j < n; j++){ m[i][j] = Math.random() * 2 - 1; }
+    }
+    return m;
+  }
+
+  function randBondMatrix(n){
+    var m = [], i, j;
+    for (i = 0; i < n; i++) m.push(new Array(n).fill(0));
+    var steps = [0, 0.25, 0.5, 0.75, 1];
+    for (i = 0; i < n; i++) for (j = 0; j < n; j++){
+      var r = Math.random();
+      m[i][j] = r < 0.55 ? 0 : steps[1 + ((Math.random() * 4) | 0)];
+    }
+    return m;
+  }
+
+  function seedPositions(n){
+    state.n = n;
+    for (var k = 0; k < n; k++){
+      state.px[k] = Math.random() * W;
+      state.py[k] = Math.random() * H;
+      state.vx[k] = 0; state.vy[k] = 0;
+      state.sp[k] = (Math.random() * state.species) | 0;
+      energy[k] = 1; alive[k] = 1;
+    }
+    bonds.clear();
+    bondCount.fill(0);
+    liveBonds = [];
+    deadStack.length = 0;
+  }
+
+  // ---------- matrix UI (local / deep share the same -1..1 look; bonds get their own) ----------
+  function paintCellSigned(el, v){
+    v = clampForce(v);
+    var color = v >= 0 ? 'rgba(110,240,200,' + (0.18 + v * 0.75) + ')' : 'rgba(255,127,166,' + (0.18 + (-v) * 0.75) + ')';
+    el.style.background = color;
+    el.title = v.toFixed(2);
+  }
+  function paintCellBond(el, v){
+    v = Math.max(0, Math.min(1, v));
+    el.style.background = 'rgba(183,148,246,' + (0.12 + v * 0.78) + ')';
+    el.title = v.toFixed(2);
+  }
+
+  function buildGenericMatrix(elId, getMatrix, steps, paintFn, hist){
+    var el = document.getElementById(elId);
+    el.innerHTML = '';
+    var n = state.species;
+    el.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+    for (var i = 0; i < n; i++){
+      for (var j = 0; j < n; j++){
+        (function(i, j){
+          var b = document.createElement('button');
+          b.className = 'm-cell';
+          b.setAttribute('aria-label', 'species ' + (i+1) + ' to ' + (j+1));
+          var m = getMatrix();
+          paintFn(b, m[i][j]);
+          b.addEventListener('click', function(){
+            hist.push(getMatrix());
+            var m2 = getMatrix();
+            var cur = m2[i][j], idx = 0, best = Infinity;
+            for (var s = 0; s < steps.length; s++){
+              var d = Math.abs(steps[s] - cur);
+              if (d < best){ best = d; idx = s; }
+            }
+            var next = steps[(idx + 1) % steps.length];
+            m2[i][j] = next;
+            paintFn(b, next);
+          });
+          el.appendChild(b);
+        })(i, j);
+      }
+    }
+  }
+
+  function buildMatrixUI(){ buildGenericMatrix('matrix', function(){ return state.matrix; }, [-1,-0.5,0,0.5,1], paintCellSigned, localHist); }
+  function buildDeepUI(){ buildGenericMatrix('deepmatrix', function(){ return state.deepMatrix; }, [-1,-0.5,0,0.5,1], paintCellSigned, deepHist); }
+  function buildBondUI(){ buildGenericMatrix('bondmatrix', function(){ return state.bondMatrix; }, [0,0.25,0.5,0.75,1], paintCellBond, bondHist); }
+
+  function undoLocal(){ if (localHist.has()){ state.matrix = localHist.pop(); buildMatrixUI(); } }
+  function undoDeep(){ if (deepHist.has()){ state.deepMatrix = deepHist.pop(); buildDeepUI(); } }
+  function undoBond(){ if (bondHist.has()){ state.bondMatrix = bondHist.pop(); buildBondUI(); } }
+
+  function mutate(){
+    localHist.push(state.matrix);
+    for (var i = 0; i < state.species; i++)
+      for (var j = 0; j < state.species; j++)
+        state.matrix[i][j] = clampForce(state.matrix[i][j] + (Math.random() * 0.5 - 0.25));
+    buildMatrixUI();
+  }
+
+  function driftLocalMatrix(){
+    var n = state.species, picks = Math.min(3, n * n);
+    for (var k = 0; k < picks; k++){
+      var i = (Math.random() * n) | 0, j = (Math.random() * n) | 0;
+      state.matrix[i][j] = clampForce(state.matrix[i][j] + (Math.random() * 2 - 1) * state.driftRate * 0.2);
+    }
+    buildMatrixUI();
+  }
+
+  function regenerate(mode, reseed){
+    state.matrix = randMatrix(state.species, mode);
+    state.deepMatrix = randMatrix(state.species, 'random');
+    state.bondMatrix = randBondMatrix(state.species);
+    localHist.clear(); deepHist.clear(); bondHist.clear();
+    state.wells = [];
+    bonds.clear(); bondCount.fill(0); liveBonds = [];
+    if (reseed) seedPositions(state.n);
+    buildMatrixUI(); buildDeepUI(); buildBondUI();
+    buildSpeciesUI(); buildPaintSwatches();
+  }
+  function rerollDeep(){ deepHist.clear(); state.deepMatrix = randMatrix(state.species, 'random'); buildDeepUI(); }
+  function rerollBond(){ bondHist.clear(); state.bondMatrix = randBondMatrix(state.species); bonds.clear(); bondCount.fill(0); buildBondUI(); }
+
+  // ---------- species UI ----------
+  function buildSpeciesUI(){
+    var wrap = document.getElementById('species-list');
+    wrap.innerHTML = '';
+    for (var i = 0; i < state.species; i++){
+      (function(i){
+        var row = document.createElement('div');
+        row.className = 'sp-row';
+
+        var top = document.createElement('div');
+        top.className = 'sp-top';
+
+        var sw = document.createElement('button');
+        sw.className = 'sp-swatch';
+        sw.title = 'click to change color';
+        sw.style.background = hueColor(state.hue[i], 1);
+        sw.addEventListener('click', function(){
+          var idx = PALETTE.indexOf(state.hue[i]);
+          state.hue[i] = PALETTE[(idx + 1 + PALETTE.length) % PALETTE.length];
+          sw.style.background = hueColor(state.hue[i], 1);
+          buildPaintSwatches();
+        });
+
+        var label = document.createElement('div');
+        label.className = 'sp-label';
+        label.textContent = 'species ' + (i + 1);
+
+        var freeze = document.createElement('button');
+        freeze.className = 'mini'; freeze.textContent = '❄'; freeze.title = 'freeze motion';
+        freeze.setAttribute('aria-pressed', state.frozen[i] ? 'true' : 'false');
+        freeze.addEventListener('click', function(){
+          state.frozen[i] = state.frozen[i] ? 0 : 1;
+          freeze.setAttribute('aria-pressed', state.frozen[i] ? 'true' : 'false');
+        });
+
+        var hide = document.createElement('button');
+        hide.className = 'mini'; hide.textContent = '◎'; hide.title = 'hide from view';
+        hide.setAttribute('aria-pressed', state.hidden[i] ? 'true' : 'false');
+        hide.addEventListener('click', function(){
+          state.hidden[i] = state.hidden[i] ? 0 : 1;
+          hide.setAttribute('aria-pressed', state.hidden[i] ? 'true' : 'false');
+        });
+
+        top.appendChild(sw); top.appendChild(label); top.appendChild(freeze); top.appendChild(hide);
+
+        var sliders = document.createElement('div');
+        sliders.className = 'sp-sliders';
+        function miniSlider(labelText, min, max, step, val, onInput){
+          var box = document.createElement('div');
+          var lab = document.createElement('label'); lab.textContent = labelText;
+          var inp = document.createElement('input');
+          inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = val;
+          inp.addEventListener('input', function(){ onInput(parseFloat(inp.value)); });
+          box.appendChild(lab); box.appendChild(inp);
+          return box;
+        }
+        sliders.appendChild(miniSlider('mass', 0.3, 3, 0.1, state.mass[i], function(v){ state.mass[i] = v; }));
+        sliders.appendChild(miniSlider('size', 1, 5, 0.2, state.size[i], function(v){ state.size[i] = v; }));
+
+        row.appendChild(top); row.appendChild(sliders);
+        wrap.appendChild(row);
+      })(i);
+    }
+    if (state.paintSpecies >= state.species) state.paintSpecies = 0;
+  }
+
+  function buildPaintSwatches(){
+    var wrap = document.getElementById('paint-swatches');
+    wrap.innerHTML = '';
+    for (var i = 0; i < state.species; i++){
+      (function(i){
+        var b = document.createElement('button');
+        b.className = 'swatch-pick';
+        b.style.background = hueColor(state.hue[i], 1);
+        b.setAttribute('aria-pressed', state.paintSpecies === i ? 'true' : 'false');
+        b.addEventListener('click', function(){
+          state.paintSpecies = i;
+          var all = wrap.querySelectorAll('.swatch-pick');
+          for (var k = 0; k < all.length; k++) all[k].setAttribute('aria-pressed', 'false');
+          b.setAttribute('aria-pressed', 'true');
+          updateHint();
+        });
+        wrap.appendChild(b);
+      })(i);
+    }
+  }
+
+  // ---------- spatial grid ----------
+  var grid = { cells: [], nx: 1, ny: 1, size: 70 };
+  function rebuildGridMeta(){
+    grid.size = state.radius;
+    grid.nx = Math.max(1, Math.ceil(W / grid.size));
+    grid.ny = Math.max(1, Math.ceil(H / grid.size));
+    var total = grid.nx * grid.ny;
+    if (grid.cells.length !== total){
+      grid.cells = new Array(total);
+      for (var k = 0; k < total; k++) grid.cells[k] = [];
+    }
+  }
+
+  function forceLaw(r, a, beta){
+    if (r < beta) return r / beta - 1;
+    if (r < 1) return a * (1 - Math.abs(2 * r - 1 - beta) / (1 - beta));
+    return 0;
+  }
+
+  var pointer = { x: 0, y: 0, down: false };
+
+  function toggleWell(x, y){
+    for (var i = 0; i < state.wells.length; i++){
+      var w = state.wells[i], dx = w.x - x, dy = w.y - y;
+      if (dx*dx + dy*dy < 20*20){ state.wells.splice(i, 1); return; }
+    }
+    if (state.wells.length >= 5) state.wells.shift();
+    state.wells.push({ x: x, y: y, strength: state.wellStrength });
+  }
+
+  function paintAt(x, y, count){
+    for (var k = 0; k < count; k++){
+      if (state.n >= MAX_N) break;
+      var idx = state.n;
+      var a = Math.random() * 6.28318, rr = Math.random() * state.brush;
+      state.px[idx] = ((x + Math.cos(a) * rr) % W + W) % W;
+      state.py[idx] = ((y + Math.sin(a) * rr) % H + H) % H;
+      state.vx[idx] = (Math.random() - 0.5) * 0.5;
+      state.vy[idx] = (Math.random() - 0.5) * 0.5;
+      state.sp[idx] = state.paintSpecies;
+      energy[idx] = 1; alive[idx] = 1;
+      state.n++;
+    }
+  }
+
+  function step(){
+    var n = state.n, px = state.px, py = state.py, vx = state.vx, vy = state.vy, sp = state.sp;
+    var rMax = state.radius, rMax2 = rMax * rMax, beta = state.beta;
+    var ff = state.force * 1.4, fr = state.friction, maxV = state.maxSpeed;
+    var wrap = state.boundary === 'wrap';
+    var i;
+
+    rebuildGridMeta();
+    var cells = grid.cells, nx = grid.nx, ny = grid.ny, cs = grid.size;
+    for (var c = 0; c < cells.length; c++) cells[c].length = 0;
+    for (i = 0; i < n; i++){
+      if (!alive[i]) continue;
+      var cx = Math.floor(px[i] / cs), cy = Math.floor(py[i] / cs);
+      if (wrap){ cx = ((cx % nx) + nx) % nx; cy = ((cy % ny) + ny) % ny; }
+      else { cx = Math.max(0, Math.min(nx - 1, cx)); cy = Math.max(0, Math.min(ny - 1, cy)); }
+      cells[cy * nx + cx].push(i);
+    }
+
+    // species centroids feed the deep-field layer
+    var ns = state.species;
+    for (i = 0; i < ns; i++){ centX[i] = 0; centY[i] = 0; centN[i] = 0; }
+    for (i = 0; i < n; i++){ if (!alive[i]) continue; var s0 = sp[i]; centX[s0] += px[i]; centY[s0] += py[i]; centN[s0]++; }
+    for (i = 0; i < ns; i++){ if (centN[i] > 0){ centX[i] /= centN[i]; centY[i] /= centN[i]; } }
+
+    // bond springs + breaks (precomputed so the main pass can add them like any other force)
+    bfx.fill(0, 0, n); bfy.fill(0, 0, n);
+    liveBonds = [];
+    var breakDist = Math.max(8, state.radius * 0.22) * state.bondBreak;
+    bonds.forEach(function(restLen, key){
+      var bi = (key / MAX_N) | 0, bj = key % MAX_N;
+      if (bi >= n || bj >= n || !alive[bi] || !alive[bj]){ bonds.delete(key); bondCount[bi] = Math.max(0, bondCount[bi]-1); bondCount[bj] = Math.max(0, bondCount[bj]-1); return; }
+      var dx = px[bj] - px[bi], dy = py[bj] - py[bi];
+      if (wrap){
+        if (dx > W/2) dx -= W; else if (dx < -W/2) dx += W;
+        if (dy > H/2) dy -= H; else if (dy < -H/2) dy += H;
+      }
+      var d = Math.sqrt(dx*dx + dy*dy);
+      if (d > breakDist || d < 0.001){
+        bonds.delete(key); bondCount[bi] = Math.max(0, bondCount[bi]-1); bondCount[bj] = Math.max(0, bondCount[bj]-1);
+        return;
+      }
+      var Fm = state.bondStiff * (d - restLen);
+      var ux = dx / d, uy = dy / d;
+      bfx[bi] += ux * Fm; bfy[bi] += uy * Fm;
+      bfx[bj] -= ux * Fm; bfy[bj] -= uy * Fm;
+      liveBonds.push(bi, bj);
+    });
+
+    var halfW = W / 2, halfH = H / 2;
+    var wells = state.wells, nw = wells.length;
+    var toolActive = pointer.down && (state.tool === 'stir' || state.tool === 'attract' || state.tool === 'vortex');
+    var speedSum = 0;
+    var bondRest = Math.max(8, state.radius * 0.22);
+    var bondFormRange = rMax * beta * 1.3;
+
+    for (i = 0; i < n; i++){
+      if (!alive[i]) continue;
+      var si = sp[i];
+      if (state.frozen[si]){ vx[i] = 0; vy[i] = 0; continue; }
+
+      var xi = px[i], yi = py[i];
+      var cxi = Math.floor(xi / cs), cyi = Math.floor(yi / cs);
+      var fx = bfx[i], fy = bfy[i];
+
+      for (var ddy = -1; ddy <= 1; ddy++){
+        var ncy = cyi + ddy;
+        if (wrap) ncy = ((ncy % ny) + ny) % ny; else if (ncy < 0 || ncy >= ny) continue;
+        for (var ddx = -1; ddx <= 1; ddx++){
+          var ncx = cxi + ddx;
+          if (wrap) ncx = ((ncx % nx) + nx) % nx; else if (ncx < 0 || ncx >= nx) continue;
+          var bucket = cells[ncy * nx + ncx];
+          for (var b = 0; b < bucket.length; b++){
+            var j = bucket[b];
+            if (j === i) continue;
+            var dx = px[j] - xi, dy = py[j] - yi;
+            if (wrap){
+              if (dx > halfW) dx -= W; else if (dx < -halfW) dx += W;
+              if (dy > halfH) dy -= H; else if (dy < -halfH) dy += H;
+            }
+            var d2 = dx * dx + dy * dy;
+            if (d2 > rMax2 || d2 < 0.0001) continue;
+            var d = Math.sqrt(d2);
+            var a = state.matrix[si][sp[j]];
+            var Fm = forceLaw(d / rMax, a, beta);
+            fx += (dx / d) * Fm;
+            fy += (dy / d) * Fm;
+
+            if (state.chemistryOn && j > i){
+              var aff = (state.bondMatrix[si][sp[j]] + state.bondMatrix[sp[j]][si]) / 2;
+              if (aff > 0 && d < bondFormRange && bonds.size < BOND_CAP && bondCount[i] < MAX_BPP && bondCount[j] < MAX_BPP){
+                var key = bondKey(i, j);
+                if (!bonds.has(key) && Math.random() < aff * 0.03){
+                  bonds.set(key, bondRest);
+                  bondCount[i]++; bondCount[j]++;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (var sIdx = 0; sIdx < ns; sIdx++){
+        var dm = state.deepMatrix[si][sIdx];
+        if (dm === 0 || centN[sIdx] === 0) continue;
+        var gdx = centX[sIdx] - xi, gdy = centY[sIdx] - yi;
+        if (wrap){
+          if (gdx > halfW) gdx -= W; else if (gdx < -halfW) gdx += W;
+          if (gdy > halfH) gdy -= H; else if (gdy < -halfH) gdy += H;
+        }
+        var gd = Math.sqrt(gdx*gdx + gdy*gdy);
+        if (gd < 1) continue;
+        var dFm = dm * state.deepStrength * 0.6;
+        fx += (gdx / gd) * dFm; fy += (gdy / gd) * dFm;
+      }
+
+      for (var wi = 0; wi < nw; wi++){
+        var w = wells[wi];
+        var wdx = w.x - xi, wdy = w.y - yi;
+        var wd2 = wdx*wdx + wdy*wdy, wr = 220;
+        if (wd2 < wr*wr && wd2 > 1){
+          var wd = Math.sqrt(wd2);
+          var wf = (1 - wd / wr) * w.strength;
+          fx += (wdx / wd) * wf; fy += (wdy / wd) * wf;
+        }
+      }
+
+      if (state.boundary === 'well'){
+        var cdx = halfW - xi, cdy = halfH - yi;
+        var cd = Math.sqrt(cdx*cdx + cdy*cdy) || 1;
+        fx += (cdx / cd) * 0.55; fy += (cdy / cd) * 0.55;
+      }
+
+      if (toolActive){
+        var pdx = xi - pointer.x, pdy = yi - pointer.y;
+        if (wrap){
+          if (pdx > halfW) pdx -= W; else if (pdx < -halfW) pdx += W;
+          if (pdy > halfH) pdy -= H; else if (pdy < -halfH) pdy += H;
+        }
+        var pd2 = pdx*pdx + pdy*pdy, pr = 150;
+        if (pd2 < pr*pr && pd2 > 1){
+          var pd = Math.sqrt(pd2);
+          var pf = (1 - pd / pr) * 2.6;
+          if (state.tool === 'stir'){ fx += (pdx/pd)*pf; fy += (pdy/pd)*pf; }
+          else if (state.tool === 'attract'){ fx -= (pdx/pd)*pf; fy -= (pdy/pd)*pf; }
+          else { fx += (-pdy/pd)*pf; fy += (pdx/pd)*pf; }
+        }
+      }
+
+      var mass = state.mass[si] || 1;
+      var nvx = (vx[i] + (fx * ff) / mass) * fr;
+      var nvy = (vy[i] + (fy * ff) / mass) * fr;
+      if (state.temp > 0){ nvx += (Math.random() - 0.5) * state.temp; nvy += (Math.random() - 0.5) * state.temp; }
+      var sp2 = nvx*nvx + nvy*nvy;
+      if (sp2 > maxV*maxV){ var sc = maxV / Math.sqrt(sp2); nvx *= sc; nvy *= sc; sp2 = maxV*maxV; }
+
+      var nx2 = xi + nvx, ny2 = yi + nvy;
+      if (wrap){
+        nx2 = ((nx2 % W) + W) % W;
+        ny2 = ((ny2 % H) + H) % H;
+      } else if (state.boundary === 'bounce'){
+        if (nx2 < 0){ nx2 = 0; nvx = -nvx * 0.9; } else if (nx2 > W){ nx2 = W; nvx = -nvx * 0.9; }
+        if (ny2 < 0){ ny2 = 0; nvy = -nvy * 0.9; } else if (ny2 > H){ ny2 = H; nvy = -nvy * 0.9; }
+      } else {
+        if (nx2 < 0){ nx2 = 0; if (nvx < 0) nvx = 0; } else if (nx2 > W){ nx2 = W; if (nvx > 0) nvx = 0; }
+        if (ny2 < 0){ ny2 = 0; if (nvy < 0) nvy = 0; } else if (ny2 > H){ ny2 = H; if (nvy > 0) nvy = 0; }
+      }
+
+      vx[i] = nvx; vy[i] = nvy; px[i] = nx2; py[i] = ny2;
+      speedSum += Math.sqrt(sp2);
+
+      if (state.lifecycleOn){
+        energy[i] += state.energyGain - state.energyMoveCost * Math.sqrt(sp2) * 0.1;
+        if (energy[i] <= 0){
+          alive[i] = 0;
+          deadStack.push(i);
+        } else if (energy[i] > state.reproThreshold && (deadStack.length > 0 || state.n < MAX_N - 1)){
+          var slot = deadStack.length ? deadStack.pop() : state.n++;
+          var childSpecies = si;
+          if (state.species > 1 && Math.random() < state.mutantChance){
+            childSpecies = (si + 1 + ((Math.random() * (state.species - 1)) | 0)) % state.species;
+          }
+          var ang = Math.random() * 6.28318;
+          px[slot] = ((nx2 + Math.cos(ang) * 6) % W + W) % W;
+          py[slot] = ((ny2 + Math.sin(ang) * 6) % H + H) % H;
+          vx[slot] = nvx * 0.3 + (Math.random() - 0.5) * 0.4;
+          vy[slot] = nvy * 0.3 + (Math.random() - 0.5) * 0.4;
+          sp[slot] = childSpecies;
+          alive[slot] = 1;
+          energy[slot] = energy[i] * state.reproCost;
+          energy[i] *= (1 - state.reproCost);
+        }
+      }
+    }
+
+    return speedSum / (n || 1);
+  }
+
+  function render(pxArr, pyArr, spArr, nCount, isLive){
+    pxArr = pxArr || state.px; pyArr = pyArr || state.py; spArr = spArr || state.sp;
+    nCount = (nCount == null) ? state.n : nCount;
+    if (isLive == null) isLive = true;
+
+    ctx.fillStyle = 'rgba(6,7,13,0.16)';
+    ctx.fillRect(0, 0, W, H);
+
+    if (isLive && liveBonds.length){
+      ctx.strokeStyle = 'rgba(183,148,246,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (var lb = 0; lb < liveBonds.length; lb += 2){
+        var bi = liveBonds[lb], bj = liveBonds[lb+1];
+        ctx.moveTo(pxArr[bi], pyArr[bi]);
+        ctx.lineTo(pxArr[bj], pyArr[bj]);
+      }
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < nCount; i++){
+      if (isLive && !alive[i]) continue;
+      var s = spArr[i];
+      if (state.hidden[s]) continue;
+      var rad = state.size[s] || 2;
+      if (isLive && state.lifecycleOn) rad *= (0.5 + 0.5 * Math.min(1, energy[i] / Math.max(0.1, state.reproThreshold)));
+      ctx.fillStyle = hueColor(state.hue[s], 0.85);
+      ctx.beginPath();
+      ctx.arc(pxArr[i], pyArr[i], rad, 0, 6.28319);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (isLive){
+      for (var cs2 = 0; cs2 < state.species; cs2++){
+        if (centN[cs2] <= 0 || state.hidden[cs2]) continue;
+        ctx.strokeStyle = hueColor(state.hue[cs2], 0.55);
+        ctx.lineWidth = 1;
+        var ccx = centX[cs2], ccy = centY[cs2];
+        ctx.beginPath();
+        ctx.moveTo(ccx - 7, ccy); ctx.lineTo(ccx + 7, ccy);
+        ctx.moveTo(ccx, ccy - 7); ctx.lineTo(ccx, ccy + 7);
+        ctx.stroke();
+      }
+    }
+
+    if (state.wells.length){
+      ctx.strokeStyle = 'rgba(241,243,251,0.35)';
+      ctx.lineWidth = 1;
+      for (var k = 0; k < state.wells.length; k++){
+        var w = state.wells[k];
+        ctx.beginPath(); ctx.arc(w.x, w.y, 7, 0, 6.28319); ctx.stroke();
+        ctx.beginPath(); ctx.setLineDash([2,4]); ctx.arc(w.x, w.y, 40, 0, 6.28319); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ---------- rewind ring buffer ----------
+  var RING_CAP = 180;
+  var ringPx = [], ringPy = [], ringN = new Uint16Array(RING_CAP);
+  for (var rc = 0; rc < RING_CAP; rc++){ ringPx.push(new Float32Array(MAX_N)); ringPy.push(new Float32Array(MAX_N)); }
+  var ringHead = 0, ringFilled = 0;
+  function pushRing(){
+    ringPx[ringHead].set(state.px);
+    ringPy[ringHead].set(state.py);
+    ringN[ringHead] = state.n;
+    ringHead = (ringHead + 1) % RING_CAP;
+    ringFilled = Math.min(ringFilled + 1, RING_CAP);
+  }
+  function getRingSlot(offset){
+    var idx = (ringHead - 1 - offset + RING_CAP * 4) % RING_CAP;
+    return { px: ringPx[idx], py: ringPy[idx], n: ringN[idx] };
+  }
+
+  // ---------- telemetry sparkline ----------
+  var telCanvas = document.getElementById('telemetry');
+  var telCtx = telCanvas.getContext('2d');
+  var speedHistory = [];
+  function drawTelemetry(){
+    var w = telCanvas.width, h = telCanvas.height;
+    telCtx.clearRect(0, 0, w, h);
+    telCtx.strokeStyle = 'rgba(154,162,192,0.25)';
+    telCtx.beginPath(); telCtx.moveTo(0, h - 1); telCtx.lineTo(w, h - 1); telCtx.stroke();
+    if (speedHistory.length < 2) return;
+    var maxV = Math.max(state.maxSpeed, 0.5);
+    telCtx.beginPath();
+    for (var i = 0; i < speedHistory.length; i++){
+      var x = (i / (speedHistory.length - 1)) * w;
+      var y = h - (Math.min(speedHistory[i], maxV) / maxV) * (h - 4) - 2;
+      if (i === 0) telCtx.moveTo(x, y); else telCtx.lineTo(x, y);
+    }
+    telCtx.strokeStyle = '#6ef0c8';
+    telCtx.lineWidth = 1.5;
+    telCtx.stroke();
+    telCtx.lineTo(w, h); telCtx.lineTo(0, h); telCtx.closePath();
+    telCtx.fillStyle = 'rgba(110,240,200,0.12)';
+    telCtx.fill();
+  }
+
+  // ---------- main loop ----------
+  var statN = document.getElementById('stat-n');
+  var statS = document.getElementById('stat-s');
+  var statV = document.getElementById('stat-v');
+  var statW = document.getElementById('stat-w');
+  var statB = document.getElementById('stat-b');
+  var statAliveG = document.getElementById('stat-alive-g');
+  var statAlive = document.getElementById('stat-alive');
+  var rewindSlider = document.getElementById('s-rewind');
+  var rewindOut = document.getElementById('o-rewind');
+  var frame = 0, lastV = 0, driftCounter = 0;
+
+  function loop(){
+    var scrubOffset = parseInt(rewindSlider.value, 10) || 0;
+    var doStep = !state.paused && scrubOffset === 0;
+
+    if (doStep){
+      var speed = state.speed, substeps = 1, skip = false;
+      if (speed >= 1) substeps = Math.round(speed);
+      else { var K = Math.round(1 / speed); skip = (frame % K !== 0); }
+      if (!skip){
+        for (var s = 0; s < substeps; s++){ lastV = step(); pushRing(); }
+        speedHistory.push(lastV);
+        if (speedHistory.length > 150) speedHistory.shift();
+        if (state.autoevolve){
+          driftCounter++;
+          if (driftCounter > 90){ driftCounter = 0; driftLocalMatrix(); }
+        }
+      }
+    }
+
+    if (scrubOffset > 0 && ringFilled > 0){
+      var slot = getRingSlot(Math.min(scrubOffset, ringFilled - 1));
+      render(slot.px, slot.py, state.sp, slot.n, false);
+    } else {
+      render();
+    }
+
+    rewindSlider.max = Math.max(0, ringFilled - 1);
+    rewindOut.textContent = scrubOffset === 0 ? 'live' : ('-' + scrubOffset);
+
+    if (frame % 12 === 0){
+      statN.textContent = state.n;
+      statS.textContent = state.species;
+      statV.textContent = lastV.toFixed(2);
+      statW.textContent = state.wells.length + ' / 5';
+      statB.textContent = bonds.size;
+      if (state.lifecycleOn){
+        var aliveCount = 0;
+        for (var ai = 0; ai < state.n; ai++) if (alive[ai]) aliveCount++;
+        statAliveG.textContent = aliveCount + ' / ' + state.n;
+        statAlive.textContent = aliveCount + ' / ' + state.n;
+      } else {
+        statAliveG.textContent = state.n;
+        statAlive.textContent = state.n;
+      }
+      drawTelemetry();
+    }
+    frame++;
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- pointer ----------
+  function toLocal(clientX, clientY){
+    var r = canvas.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
+  }
+  canvas.addEventListener('pointerdown', function(e){
+    var p = toLocal(e.clientX, e.clientY);
+    pointer.x = p.x; pointer.y = p.y; pointer.down = true;
+    canvas.setPointerCapture(e.pointerId);
+    if (state.tool === 'well') toggleWell(p.x, p.y);
+    else if (state.tool === 'paint') paintAt(p.x, p.y, 8);
+  });
+  canvas.addEventListener('pointermove', function(e){
+    if (!pointer.down) return;
+    var p = toLocal(e.clientX, e.clientY);
+    pointer.x = p.x; pointer.y = p.y;
+    if (state.tool === 'paint') paintAt(p.x, p.y, 1);
+  });
+  canvas.addEventListener('pointerup', function(){ pointer.down = false; });
+  canvas.addEventListener('pointercancel', function(){ pointer.down = false; });
+
+  function updateHint(){
+    var hint = document.getElementById('hint');
+    var msgs = {
+      stir: 'drag in the void to stir the swarm',
+      attract: 'drag to pull the swarm toward you',
+      vortex: 'drag to spin a vortex',
+      paint: 'click or drag to paint species ' + (state.paintSpecies + 1),
+      well: 'click to place or remove a gravity well'
+    };
+    hint.textContent = msgs[state.tool] || msgs.stir;
+  }
+
+  // ---------- tabs ----------
+  var tabBtns = document.querySelectorAll('.tab-btn');
+  function activateTab(name){
+    for (var k = 0; k < tabBtns.length; k++) tabBtns[k].classList.toggle('active', tabBtns[k].getAttribute('data-tab') === name);
+    var panels = document.querySelectorAll('.tab-panel');
+    for (var p = 0; p < panels.length; p++) panels[p].hidden = panels[p].getAttribute('data-panel') !== name;
+  }
+  for (var ti = 0; ti < tabBtns.length; ti++){
+    tabBtns[ti].addEventListener('click', function(){ activateTab(this.getAttribute('data-tab')); });
+  }
+
+  // ---------- tool buttons ----------
+  var toolBtns = document.querySelectorAll('[data-tool]');
+  function setTool(name){
+    state.tool = name;
+    for (var k = 0; k < toolBtns.length; k++) toolBtns[k].setAttribute('aria-pressed', toolBtns[k].getAttribute('data-tool') === name ? 'true' : 'false');
+    document.getElementById('paint-controls').hidden = (name !== 'paint');
+    document.getElementById('well-controls').hidden = (name !== 'well');
+    updateHint();
+  }
+  for (var tb = 0; tb < toolBtns.length; tb++){
+    toolBtns[tb].addEventListener('click', function(){ setTool(this.getAttribute('data-tool')); });
+  }
+
+  // ---------- top-level controls ----------
+  var toggle = document.getElementById('toggle');
+  var panel = document.getElementById('panel');
+  toggle.addEventListener('click', function(){
+    var open = panel.hasAttribute('hidden');
+    if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+
+  function bindSlider(id, outId, onChange, fmt){
+    var el = document.getElementById(id);
+    var out = document.getElementById(outId);
+    el.addEventListener('input', function(){
+      var v = parseFloat(el.value);
+      out.textContent = fmt ? fmt(v) : v;
+      onChange(v);
+    });
+  }
+
+  bindSlider('s-species', 'o-species', function(v){
+    state.species = v | 0;
+    regenerate(document.getElementById('preset').value, true);
+  });
+  bindSlider('s-count', 'o-count', function(v){ seedPositions(v | 0); });
+  bindSlider('s-force', 'o-force', function(v){ state.force = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-friction', 'o-friction', function(v){ state.friction = v; }, function(v){ return v.toFixed(3); });
+  bindSlider('s-radius', 'o-radius', function(v){ state.radius = v | 0; });
+  bindSlider('s-beta', 'o-beta', function(v){ state.beta = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-deepstrength', 'o-deepstrength', function(v){ state.deepStrength = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-temp', 'o-temp', function(v){ state.temp = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-maxv', 'o-maxv', function(v){ state.maxSpeed = v; }, function(v){ return v.toFixed(1); });
+  bindSlider('s-speed', 'o-speed', function(v){ state.speed = v; }, function(v){ return v.toFixed(2) + '×'; });
+  bindSlider('s-brush', 'o-brush', function(v){ state.brush = v | 0; });
+  bindSlider('s-wellstr', 'o-wellstr', function(v){ state.wellStrength = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-driftrate', 'o-driftrate', function(v){ state.driftRate = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-bondstiff', 'o-bondstiff', function(v){ state.bondStiff = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-bondbreak', 'o-bondbreak', function(v){ state.bondBreak = v; }, function(v){ return v.toFixed(1); });
+  bindSlider('s-egain', 'o-egain', function(v){ state.energyGain = v; }, function(v){ return v.toFixed(3); });
+  bindSlider('s-mcost', 'o-mcost', function(v){ state.energyMoveCost = v; }, function(v){ return v.toFixed(3); });
+  bindSlider('s-repro', 'o-repro', function(v){ state.reproThreshold = v; }, function(v){ return v.toFixed(1); });
+  bindSlider('s-rcost', 'o-rcost', function(v){ state.reproCost = v; }, function(v){ return v.toFixed(2); });
+  bindSlider('s-mutant', 'o-mutant', function(v){ state.mutantChance = v; }, function(v){ return v.toFixed(2); });
+
+  document.getElementById('s-boundary').addEventListener('change', function(e){ state.boundary = e.target.value; });
+
+  document.getElementById('btn-organism').addEventListener('click', function(){ regenerate(document.getElementById('preset').value, true); });
+  document.getElementById('btn-mutate').addEventListener('click', mutate);
+  document.getElementById('btn-reseed').addEventListener('click', function(){ seedPositions(state.n); });
+  document.getElementById('btn-undo').addEventListener('click', undoLocal);
+  document.getElementById('preset').addEventListener('change', function(e){ regenerate(e.target.value, true); });
+  document.getElementById('btn-deep-reroll').addEventListener('click', rerollDeep);
+  document.getElementById('btn-deep-undo').addEventListener('click', undoDeep);
+
+  var driftBtn = document.getElementById('btn-drift');
+  function setDrift(on){ state.autoevolve = on; driftBtn.textContent = 'Drift: ' + (on ? 'on' : 'off'); driftBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  driftBtn.addEventListener('click', function(){ setDrift(!state.autoevolve); });
+
+  var chemBtn = document.getElementById('btn-chem-toggle');
+  function setChem(on){ state.chemistryOn = on; chemBtn.textContent = 'Bonds: ' + (on ? 'on' : 'off'); chemBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  chemBtn.addEventListener('click', function(){ setChem(!state.chemistryOn); });
+  document.getElementById('btn-chem-reroll').addEventListener('click', rerollBond);
+  document.getElementById('btn-bond-undo').addEventListener('click', undoBond);
+
+  var lifeBtn = document.getElementById('btn-life-toggle');
+  function setLife(on){ state.lifecycleOn = on; lifeBtn.textContent = 'Life: ' + (on ? 'on' : 'off'); lifeBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  lifeBtn.addEventListener('click', function(){ setLife(!state.lifecycleOn); });
+
+  var pauseBtn = document.getElementById('btn-pause');
+  function setPaused(p){ state.paused = p; pauseBtn.textContent = p ? 'Resume' : 'Pause'; pauseBtn.setAttribute('aria-pressed', p ? 'true' : 'false'); }
+  pauseBtn.addEventListener('click', function(){ setPaused(!state.paused); });
+  document.getElementById('btn-step').addEventListener('click', function(){
+    setPaused(true); rewindSlider.value = 0; lastV = step(); pushRing(); render();
+  });
+  document.getElementById('btn-clearwells').addEventListener('click', function(){ state.wells = []; });
+
+  // ---------- codex ----------
+  var seedOut = document.getElementById('seed-out');
+  var seedIn = document.getElementById('seed-in');
+  function roundMatrix(m){ return m.map(function(row){ return row.map(function(x){ return Math.round(x * 100) / 100; }); }); }
+  function buildSeedObj(){
+    return {
+      v: 3, sp: state.species,
+      m: roundMatrix(state.matrix), dm: roundMatrix(state.deepMatrix), bm: roundMatrix(state.bondMatrix),
+      f: state.force, fr: state.friction, r: state.radius, beta: state.beta, ds: state.deepStrength,
+      temp: state.temp, ms: state.maxSpeed, b: state.boundary,
+      bs: state.bondStiff, bb: state.bondBreak, ce: state.chemistryOn ? 1 : 0,
+      dr: state.autoevolve ? 1 : 0, drr: state.driftRate,
+      lo: state.lifecycleOn ? 1 : 0, eg: state.energyGain, mc: state.energyMoveCost,
+      rt: state.reproThreshold, rc: state.reproCost, mu: state.mutantChance,
+      mass: Array.from(state.mass.slice(0, state.species)),
+      size: Array.from(state.size.slice(0, state.species)),
+      hue: Array.from(state.hue.slice(0, state.species)),
+      frz: Array.from(state.frozen.slice(0, state.species)),
+      hid: Array.from(state.hidden.slice(0, state.species))
+    };
+  }
+  function refreshSeedOut(){
+    try { seedOut.value = btoa(unescape(encodeURIComponent(JSON.stringify(buildSeedObj())))); }
+    catch(e){ seedOut.value = ''; }
+  }
+  document.getElementById('btn-copy').addEventListener('click', function(){
+    var btn = this;
+    refreshSeedOut();
+    seedOut.select();
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(seedOut.value).then(function(){
+        btn.textContent = 'Copied'; setTimeout(function(){ btn.textContent = 'Copy seed'; }, 1200);
+      }).catch(function(){});
+    }
+  });
+  document.getElementById('btn-load').addEventListener('click', function(){
+    try {
+      var obj = JSON.parse(decodeURIComponent(escape(atob(seedIn.value.trim()))));
+      if (!obj || !obj.sp || !obj.m) throw new Error('bad seed');
+      var n = Math.max(2, Math.min(MAX_SP, obj.sp | 0));
+      state.species = n;
+      state.matrix = obj.m.slice(0, n).map(function(row){ return row.slice(0, n); });
+      state.deepMatrix = (obj.dm ? obj.dm.slice(0, n).map(function(row){ return row.slice(0, n); }) : randMatrix(n, 'random'));
+      state.bondMatrix = (obj.bm ? obj.bm.slice(0, n).map(function(row){ return row.slice(0, n); }) : randBondMatrix(n));
+      localHist.clear(); deepHist.clear(); bondHist.clear();
+      state.wells = []; bonds.clear(); bondCount.fill(0); liveBonds = [];
+      state.force = obj.f || 1; state.friction = obj.fr || 0.9; state.radius = obj.r || 70;
+      state.beta = obj.beta || 0.3; state.deepStrength = (obj.ds != null) ? obj.ds : 0.5;
+      state.temp = obj.temp || 0; state.maxSpeed = obj.ms || 6; state.boundary = obj.b || 'wrap';
+      state.bondStiff = (obj.bs != null) ? obj.bs : 0.18; state.bondBreak = (obj.bb != null) ? obj.bb : 3;
+      setChem(obj.ce !== 0); setDrift(!!obj.dr); state.driftRate = (obj.drr != null) ? obj.drr : 0.3;
+      setLife(!!obj.lo);
+      state.energyGain = (obj.eg != null) ? obj.eg : 0.012;
+      state.energyMoveCost = (obj.mc != null) ? obj.mc : 0.01;
+      state.reproThreshold = (obj.rt != null) ? obj.rt : 2;
+      state.reproCost = (obj.rc != null) ? obj.rc : 0.5;
+      state.mutantChance = (obj.mu != null) ? obj.mu : 0.05;
+      for (var i = 0; i < n; i++){
+        state.mass[i] = (obj.mass && obj.mass[i]) || 1;
+        state.size[i] = (obj.size && obj.size[i]) || 2;
+        state.hue[i] = (obj.hue && obj.hue[i]) || HUES[i];
+        state.frozen[i] = (obj.frz && obj.frz[i]) ? 1 : 0;
+        state.hidden[i] = (obj.hid && obj.hid[i]) ? 1 : 0;
+      }
+      document.getElementById('s-species').value = n; document.getElementById('o-species').textContent = n;
+      document.getElementById('s-force').value = state.force; document.getElementById('o-force').textContent = state.force.toFixed(2);
+      document.getElementById('s-friction').value = state.friction; document.getElementById('o-friction').textContent = state.friction.toFixed(3);
+      document.getElementById('s-radius').value = state.radius; document.getElementById('o-radius').textContent = state.radius;
+      document.getElementById('s-beta').value = state.beta; document.getElementById('o-beta').textContent = state.beta.toFixed(2);
+      document.getElementById('s-deepstrength').value = state.deepStrength; document.getElementById('o-deepstrength').textContent = state.deepStrength.toFixed(2);
+      document.getElementById('s-temp').value = state.temp; document.getElementById('o-temp').textContent = state.temp.toFixed(2);
+      document.getElementById('s-maxv').value = state.maxSpeed; document.getElementById('o-maxv').textContent = state.maxSpeed.toFixed(1);
+      document.getElementById('s-boundary').value = state.boundary;
+      document.getElementById('s-bondstiff').value = state.bondStiff; document.getElementById('o-bondstiff').textContent = state.bondStiff.toFixed(2);
+      document.getElementById('s-bondbreak').value = state.bondBreak; document.getElementById('o-bondbreak').textContent = state.bondBreak.toFixed(1);
+      document.getElementById('s-driftrate').value = state.driftRate; document.getElementById('o-driftrate').textContent = state.driftRate.toFixed(2);
+      document.getElementById('s-egain').value = state.energyGain; document.getElementById('o-egain').textContent = state.energyGain.toFixed(3);
+      document.getElementById('s-mcost').value = state.energyMoveCost; document.getElementById('o-mcost').textContent = state.energyMoveCost.toFixed(3);
+      document.getElementById('s-repro').value = state.reproThreshold; document.getElementById('o-repro').textContent = state.reproThreshold.toFixed(1);
+      document.getElementById('s-rcost').value = state.reproCost; document.getElementById('o-rcost').textContent = state.reproCost.toFixed(2);
+      document.getElementById('s-mutant').value = state.mutantChance; document.getElementById('o-mutant').textContent = state.mutantChance.toFixed(2);
+      buildMatrixUI(); buildDeepUI(); buildBondUI(); buildSpeciesUI(); buildPaintSwatches();
+      seedPositions(state.n);
+      refreshSeedOut();
+    } catch(e){
+      seedIn.value = 'could not read that seed — check it was copied in full';
+    }
+  });
+
+  // ---------- keyboard ----------
+  window.addEventListener('keydown', function(e){
+    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
+    switch(e.key){
+      case ' ': e.preventDefault(); setPaused(!state.paused); break;
+      case 'n': case 'N': regenerate(document.getElementById('preset').value, true); break;
+      case 'm': case 'M': mutate(); break;
+      case 'r': case 'R': seedPositions(state.n); break;
+      case 'u': case 'U': undoLocal(); break;
+      case 'd': case 'D': setDrift(!state.autoevolve); break;
+      case 'c': case 'C': setChem(!state.chemistryOn); break;
+      case 'v': case 'V': setLife(!state.lifecycleOn); break;
+      case 'l': case 'L': rewindSlider.value = 0; break;
+      case '[': { var fs = document.getElementById('s-force'); fs.value = Math.max(0.2, parseFloat(fs.value) - 0.05).toFixed(2); fs.dispatchEvent(new Event('input')); break; }
+      case ']': { var fs2 = document.getElementById('s-force'); fs2.value = Math.min(3, parseFloat(fs2.value) + 0.05).toFixed(2); fs2.dispatchEvent(new Event('input')); break; }
+      default:
+        if (e.key >= '1' && e.key <= '6'){
+          var idx = parseInt(e.key, 10) - 1;
+          if (idx < state.species){
+            state.paintSpecies = idx;
+            setTool('paint');
+            activateTab('field');
+            buildPaintSwatches();
+          }
+        }
+    }
+  });
+
+  // ---------- boot ----------
+  seedPositions(state.n);
+  regenerate('cells', false);
+  setTool('stir');
+  setChem(true);
+  setDrift(false);
+  setLife(false);
+  refreshSeedOut();
+  setInterval(refreshSeedOut, 4000);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
